@@ -1,3 +1,5 @@
+> **Correction, 31 October 2026:** Read [CORRECTION-2026-10-31.md](CORRECTION-2026-10-31.md) first. It supersedes the closure proportions and causal interpretations below. WRITEUP.pdf is the historical 28 October submission, not a corrected PDF. Prediction CSVs are unchanged.
+
 # Bias Bounty Mapping Equity Challenge: methodology and bias discovery
 
 - Zindi username: **designmastersolutions** (Design Master Solutions LLC, Alan De Bortolo, solo)

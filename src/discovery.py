@@ -15,7 +15,7 @@ def quality(con, r):
       q as (select id, categories.primary cat, confidence, operating_status st, len(sources) nsrc,
                    list_transform(sources, lambda s: s.dataset) ds, geometry from '{D}/{r}-overture-pois.parquet')
       select t.GEOID, '{r}' region, count(*) n_places,
-        avg((st='permanently_closed')::int) closed_share,
+        count(*) filter (where st='permanently_closed')::double / count(*) closed_share,
         avg(confidence) mean_conf,
         avg((confidence < 0.5)::int) lowconf_share,
         avg((list_unique(ds)=1)::int) single_source_share,
