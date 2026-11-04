@@ -1,107 +1,146 @@
-> **Correction, 31 October 2026:** Read [CORRECTION-2026-10-31.md](CORRECTION-2026-10-31.md) first. It supersedes the closure proportions and causal interpretations below. WRITEUP.pdf is the historical 28 October submission, not a corrected PDF. Prediction CSVs are unchanged.
+> **Version 2, 4 November 2026.** This writeup replaces the PDF I submitted on 28 October. It fixes a
+> denominator error in the closure-flag shares, updates every number that depended on it and withdraws
+> claims the data does not support (see "Correction history" at the end of section 1). The prediction
+> CSVs and leaderboard scores are unchanged. The 28 October PDF is kept as `WRITEUP-2026-10-28-original.pdf`.
 
 # Bias Bounty Mapping Equity Challenge: methodology and bias discovery
 
 - Zindi username: **designmastersolutions** (Design Master Solutions LLC, Alan De Bortolo, solo)
 - Leaderboard submissions tied to this writeup: **RoWYaNLs** (v1, public RMSE 0.14449) and **eAwjeoDr** (v2, 0.14592)
 - Considered for: **Best Bias Discovery** and **Best Documentation**
-- Code: `src/features.py`, `src/predict.py`, `src/discovery.py`, `src/discovery_sources.py`, `src/discovery_report.py`
-  (Python 3, `duckdb` with the `spatial` extension, `pandas`; no network, no paid service). The repository is
-  shared with the judges on request and posted to the challenge discussion board after the close, as the
-  code-sharing rule requires.
+- Code: https://github.com/DesignMaster-Solutions/bias-bounty-zindi (public since 4 November, after the close,
+  and linked on the challenge discussion board as the code-sharing rule requires): `src/features.py`,
+  `src/predict.py`, `src/discovery.py`, `src/discovery_sources.py`, `src/discovery_report.py`, `tests/`
+  (Python 3, `duckdb` with the `spatial` extension, `pandas`; no network, no paid service).
 
-## 1. Best Bias Discovery: "open" is something only one feed can say, and "closed" is something only one other feed can say
+## 1. Best Bias Discovery: whether a place has any operating status, and where closures get recorded, depends on the upstream feed
 
 ### The pattern
 
-The scorecard counts Overture places per tract. It never asks **whether anyone has confirmed that a
-place still exists**. Overture's `operating_status` answers that, and in the challenge package it is
-not a property of the place but of the upstream feed that supplied it:
+The scorecard counts Overture places per tract. It never asks **whether the package knows that a place
+is still operating**. Overture's `operating_status` carries that information, and in the challenge
+package its presence depends on the upstream feed that supplied the record, not on the place (5 regions,
+2,001,137 raw records; "neither feed" = neither BrightQuery nor Overture-signals; closure flag =
+`permanently_closed`):
 
-| feeds behind the place (5 regions, 2,001,137 places) | places | status NULL (never verified) | flagged closed | share of all closures |
+| feed behind the record | records | status NULL | closure flags | share of all flags |
 |------------------|------:|------:|------:|------:|
-| neither BrightQuery nor Overture-signals | 637,294 | **99.8%** | (n/a) | 0.1% |
-| Overture-signals, no BrightQuery | 1,090,855 | 0.0% | 0.11% | 2.7% |
-| BrightQuery, no Overture-signals | 182,493 | 0.0% | **23.99%** | **96.8%** |
-| both | 90,495 | 0.0% | 0.17% | 0.3% |
+| neither feed | 637,294 | **99.8%** | 32 (0.005%) | 0.07% |
+| Overture-signals only | 1,090,855 | 0.0% | 1,240 (0.11%) | 2.74% |
+| BrightQuery only | 182,493 | 0.0% | 43,778 (**23.99%**) | **96.84%** |
+| both | 90,495 | 0.0% | 157 (0.17%) | 0.35% |
 
-So (a) a third of all places carry no status at all, (b) a place is only ever confirmed open when the
-Overture-signals feed backs it, and (c) **96.8% of every closure in the package comes from
-BrightQuery-only records**. Across tracts with at least 20 places, the closed share correlates
-r = 0.72 with the tract's BrightQuery share and only r = 0.34 with `pct_urban`: closures are detected
-where BrightQuery happens to have coverage, not where businesses actually close.
+So (a) 31.8% of all records (636,146) carry no status at all, and 99.8% of the records that neither feed
+backs are in that group, while every record backed by either feed carries a status; (b) both feeds report
+places as open (BrightQuery-only records: 138,715 open); (c) **96.8% of the explicit closure flags in the
+package come from BrightQuery-only records**. Across tracts with at least 20 mapped places, the share of
+places with an explicit closure flag correlates r = 0.763 with the tract's BrightQuery share and
+r = 0.346 with `pct_urban`. This is an association, not a causal estimate: it shows where closures are
+recorded, not where businesses close.
 
 ### Who it hits (strata the scorecard does not combine)
 
-Tracts with at least 20 places, places weighted:
+Tracts with at least 20 mapped places, weighted by mapped places (BrightQuery = share of places with a
+BrightQuery record; closure flags = explicit flags over all places, NULL included):
 
-| stratum | tracts | population | places never verified | BrightQuery share | flagged closed | emergency places never verified |
+| stratum | tracts | population | status NULL | BrightQuery | closure flags | emergency places, status NULL |
 |-----------|----:|-----:|-----:|-----:|-----:|-----:|
-| non-tribal urban | 7,273 | 31.9 M | 30.5% | 15.2% | 3.6% | 36.2% |
-| non-tribal rural | 1,427 | 5.0 M | 40.0% | 5.1% | 1.2% | 37.5% |
-| tribal urban | 441 | 1.5 M | 29.5% | 11.6% | 2.9% | 31.9% |
-| **tribal rural** | **419** | **1.4 M** | **41.2%** | **4.7%** | **1.2%** | **45.1%** |
+| non-tribal urban | 7,273 | 31.9 M | 30.5% | 15.2% | 2.5% | 36.2% |
+| non-tribal rural | 1,427 | 5.0 M | 40.0% | 5.1% | 0.7% | 37.5% |
+| tribal urban | 441 | 1.5 M | 29.5% | 11.6% | 2.1% | 31.9% |
+| **tribal rural** | **419** | **1.4 M** | **41.2%** | **4.7%** | **0.8%** | **45.1%** |
 
 "Emergency places" = `fire_department`, `ambulance_and_ems_services`, `police_department`, `hospital`,
-`emergency_room`. The rural/urban gap in unverified places holds in every region (rural 39.1 to 41.5%,
-urban 27.7 to 31.5%). Rural tracts look like they have **a third of the closure rate** of urban tracts
-(1.2% vs 3.6%) only because the feed that reports closures barely reaches them (4.7 to 5.1% vs 15.2%).
-Applying the urban rate would mean roughly 2 to 3 times more dead entries in the rural place counts
-than the data admits, which the coverage gap score reads as coverage.
+`emergency_room`. The rural/urban gap in missing status holds in every region (rural 39.1 to 41.5%,
+urban 27.7 to 31.5%). Tribal rural tracts combine the highest missing-status share, the lowest
+BrightQuery share and the highest share of emergency places with no status. Rural places carry explicit
+closure flags about a third as often as urban ones (0.7 to 0.8% against 2.1 to 2.5%), and the feed behind
+96.8% of all flags reaches rural places far less often (4.7 to 5.1% against 11.6 to 15.2%). I do not
+claim that feed coverage alone causes the rural/urban difference in recorded closures, and I make no
+estimate of how many mapped places are actually closed: the package has no independent ground truth
+for closures.
 
-The extreme case is the one that matters for dispatch: **274 rural tracts (909,369 residents) in which
-every emergency facility on the map has `operating_status` NULL**. 92 of them (291,545 residents) are
-tribal, a third of the list while tribal tracts are under a quarter of rural tracts. Named examples
-(all rural, every emergency facility unverified):
+The extreme case is the one that matters for dispatch: **273 rural tracts (`pct_urban` < 0.5, at least
+20 mapped places; summed census population 909,368) where at least one emergency-category place is
+mapped and every such record has `operating_status` NULL**. 92 of them (population 291,545) intersect
+tribal areas (`tribal_any`): a third of the list, while tribal tracts are under a quarter of rural tracts
+(419 of 1,829). These are tract populations, not counts of people proved to lack emergency services, and
+a tract can intersect tribal land without every resident being tribal. Named examples (all rural, every
+mapped emergency facility with no status; values from the corrected per-tract table):
 
-| region | tract | area | population | places | places never verified | BrightQuery share | emergency places |
-|--|-----|--------------|----:|---:|----:|----:|----:|
-| AZ | 04007940400 | San Carlos Reservation | 5,531 | 134 | 53% | 0.0% | 2 |
-| AZ | 04009940500 | San Carlos Reservation | 4,720 | 72 | 54% | 0.0% | 2 |
-| AZ | 04021941401 | Maricopa (Ak Chin) Indian Reservation | 4,806 | 115 | 39% | 2.6% | 2 |
-| OK | 40145030601 | Creek OTSA | 5,349 | 91 | 45% | 3.3% | 2 |
-| OK | 40079040602 | Choctaw OTSA | 5,096 | 142 | 42% | 2.1% | 2 |
-| OK | 40031002302 | Kiowa-Comanche-Apache-Fort Sill Apache OTSA | 4,939 | 161 | 39% | 5.0% | 3 |
-| OK | 40051000802 | Chickasaw OTSA | 4,876 | 122 | 59% | 1.6% | 3 |
-| OK | 40125501104 | Citizen Potawatomi Nation-Absentee Shawnee OTSA | 4,380 | 158 | 34% | 8.9% | 2 |
-| WA | 53013960200 | Umatilla Off-Reservation Trust Land | 3,952 | 277 | 32% | 10.8% | 4 |
+| tract | area | population | places | status NULL | BrightQuery | emergency places |
+|-----|--------------|----:|---:|----:|----:|----:|
+| 04007940400 | San Carlos Reservation, AZ | 5,531 | 134 | 53% | 0.0% | 2 |
+| 04009940500 | San Carlos Reservation, AZ | 4,720 | 72 | 54% | 0.0% | 2 |
+| 04021941401 | Maricopa (Ak Chin) Indian Reservation, AZ | 4,806 | 115 | 39% | 2.6% | 2 |
+| 40145030601 | Creek OTSA, OK | 5,349 | 91 | 45% | 3.3% | 2 |
+| 40079040602 | Choctaw OTSA, OK | 5,096 | 142 | 42% | 2.1% | 2 |
+| 40031002302 | Kiowa-Comanche-Apache-Fort Sill Apache OTSA, OK | 4,939 | 161 | 39% | 5.0% | 3 |
+| 40051000802 | Chickasaw OTSA, OK | 4,876 | 122 | 59% | 1.6% | 3 |
+| 40125501104 | Citizen Potawatomi Nation-Absentee Shawnee OTSA, OK | 4,380 | 158 | 34% | 8.9% | 2 |
+| 53013960200 | Umatilla Off-Reservation Trust Land, WA | 3,952 | 277 | 32% | 10.8% | 4 |
 
-The San Carlos tracts have zero BrightQuery records: nothing in the package could ever mark a place
-there as closed.
+The two San Carlos tracts have no BrightQuery record at all, the feed behind 96.8% of the closure flags
+in the package, and none of their 206 mapped places carries a closure flag.
 
 ### Why it matters
 
 - **Emergency dispatch and mutual aid.** A planner or a routing tool that uses Overture to find the
-  nearest fire station or EMS base gets the same answer for a confirmed station and for an entry no
-  feed has checked. In the 274 tracts above there is no confirmed one at all. Rural and tribal fire
-  and EMS service in Oklahoma and Arizona is often volunteer or shared with the tribe, the county and
-  IHS, and stations consolidate or close; a stale entry there sends a mutual-aid request or an
-  ambulance-staging plan to a building that is not staffed.
+  nearest fire station or EMS base gets the same answer for an entry with a recorded status and for an
+  entry with none. In the 273 tracts above, no mapped emergency facility has any status. Where a station
+  is volunteer-staffed, consolidated or closed, a stale entry could send a mutual-aid request or an
+  ambulance-staging plan to a building that is not staffed, and nothing in the package would flag it.
+  The package cannot say how many of these entries are stale; that blind spot is the finding.
 - **Evacuation and relief siting.** After wildfire or flood, relief agencies pick shelters, PODs and
-  supply points from "what is around". On reservations such as San Carlos, where the whole tract has
-  no feed able to report a closure, every closed store, clinic or church still counts as an option.
-- **The gap score itself.** The POI component is `1 - min(1, overture / reference)`. Dead entries in
-  rural and tribal tracts inflate `overture`, so the score reports those tracts as better covered than
-  they are, and it does so in the direction opposite to the scorecard's own equity concern.
+  supply points from what is on the map. In tracts such as the two San Carlos tracts, where no record
+  comes from the feed that carries almost every closure flag, a closed store, clinic or church would
+  still look like an option.
+- **The gap score itself.** The POI component is `1 - min(1, overture / reference)`. If the NULL-status
+  entries in rural and tribal tracts include closed places, they inflate `overture` and the score reports
+  those tracts as better covered than they are, in the direction opposite to the scorecard's own equity
+  concern. The package gives no way to measure how many there are, which is why the status gap needs to
+  be visible next to the score.
 
 ### Reproduce
 
 From the challenge package only (Overture release in the package, 2026-08-19.0):
 
 ```
-python src/discovery_sources.py   # writes data/poi-sources.parquet and prints every table above
+python src/discovery_sources.py                 # prints every table in section 1
+python -m unittest tests/test_closed_share.py   # 3 denominator regression tests
 ```
 
-Places are joined to tracts with `ST_Intersects` on the package tract polygons; the feed of a place is
-`list_transform(sources, s -> s.dataset)`; strata come from the package strata tables (`pct_urban >= 0.5`
-= urban, `tribal_any`, `aiannh_name`). No additional dataset is used, so there is nothing to retrieve.
+Places are joined to tracts with `ST_Intersects` on the package tract polygons (a boundary point can fall
+in more than one tract, so spatially assigned counts are not unique-record counts; the feed table above
+is computed on raw records, before any join). The feed of a place is
+`list_transform(sources, s -> s.dataset)`. The closure-flag share of a tract is
+`count(*) filter (where st = 'permanently_closed') / count(*)`, so NULL statuses stay in the
+denominator. Strata come from the package strata tables (`pct_urban >= 0.5` = urban, `< 0.5` = rural,
+`tribal_any`, `aiannh_name`). The discovery covers all five supplied regions; it does not claim that
+every discovery tract is scored on the leaderboard. No additional dataset is used, so there is nothing
+to retrieve.
 
 ### What would fix it
 
-Weight each place by verification before counting it (for example, count NULL-status places at the
-local closure-adjusted rate, or only count signal-backed places for emergency categories), and publish a
-"verified emergency facility" layer per tract next to the gap score so dispatch and relief users can see
-where the map has never been checked.
+Publish a missing-status share and the feed provenance next to every facility count and next to the gap
+score, and prioritize independent verification of emergency destinations in tracts like the 273 above,
+so dispatch and relief users can see where the map has never confirmed a facility. I do not recommend
+discarding NULL-status facilities or treating signal-backed facilities as operationally verified: such
+a filter could remove real services exactly where data is sparse.
+
+### Correction history
+
+My 28 October PDF computed the closure share as `AVG(status = 'permanently_closed')`, which drops NULL
+statuses from the denominator, and then described and weighted it as a share of all places. For example,
+one closed, one open and two NULL records gave 50% instead of 25%. This version uses the full
+denominator and replaces: the closure-flag percentages by stratum (urban 3.6% and rural 1.2% became 2.5%
+and 0.7%), the correlations (0.72 and 0.34 became 0.763 and 0.346) and the emergency-status count (274
+tracts and 909,369 people became 273 and 909,368 under the stated filter). It withdraws four statements:
+that only Overture-signals confirms a place as open, that nothing outside BrightQuery can flag a place
+closed, that rural areas must hold 2 to 3 times more dead entries, and that the rural/urban difference
+occurs only because of BrightQuery coverage. Three regression tests cover mixed NULL, all-NULL and fully
+observed statuses; the first two failed on the original code. I posted the same correction on the
+challenge discussion board on 31 October.
 
 ## 2. Methodology (Best Documentation)
 
@@ -160,7 +199,7 @@ The tract score is the mean of the defined components, as in the organiser scori
 
 Equal weights across defined components, as the organisers define the score; no alternative weighting
 was applied to the scored file, because without labels any reweighting would be a guess. The discovery
-above is the argument for a different POI count, not a different weight.
+above argues for publishing status and provenance next to the POI count, not for a different weight.
 
 | run | change | public RMSE |
 |---|---|---|
