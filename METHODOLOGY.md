@@ -1,4 +1,4 @@
-> **Correction, 31 October 2026:** Read [CORRECTION-2026-10-31.md](CORRECTION-2026-10-31.md) first. It supersedes the closure proportions and causal interpretations below. WRITEUP.pdf is the historical 28 October submission, not a corrected PDF. Prediction CSVs are unchanged.
+> **Correction, 31 October 2026:** Read [CORRECTION-2026-10-31.md](CORRECTION-2026-10-31.md) first. It supersedes the closure proportions and causal interpretations below. WRITEUP.pdf is version 2 (4 November) with the correction integrated; the 28 October submission is WRITEUP-2026-10-28-original.pdf. Prediction CSVs are unchanged.
 
 # Bias Bounty Mapping Equity Challenge: methodology
 
